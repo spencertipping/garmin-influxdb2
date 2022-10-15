@@ -63,7 +63,7 @@ def day_sleep(d, e, g, w):
   w(ic.Point('sleep')
     .field('sleep_seconds', d['sleepTimeSeconds'])
     .field('nap_seconds', d['napTimeSeconds'])
-    .tag('sleep_window_confiremd', d['sleepWindowConfirmed'])
+    .tag('sleep_window_confirmed', d['sleepWindowConfirmed'])
     .tag('sleep_window_confirmation_type', d['sleepWindowConfirmationType'])
     .field('unmeasurable_seconds', d['unmeasurableSleepSeconds'])
     .field('deep_seconds', d['deepSleepSeconds'])
