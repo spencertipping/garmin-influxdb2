@@ -4,8 +4,30 @@ import influxdb_client as ic
 import argparse as ap
 import datetime as dt
 
+import json
 import getpass
 import sys
+
+
+def day_hrv(d, e, g, w):
+  hrv = g.get_hrv_data(d)
+
+  if hrv:
+    w(ic.Point('hrv')
+      .field('weekly_avg', hrv['hrvSummary']['weeklyAvg'])
+      .field('night_avg',  hrv['hrvSummary']['lastNightAvg'])
+      .time(hrv['hrvSummary']['createTimeStamp']))
+
+    if hrv['hrvSummary'].get('baseline') is not None:
+      w(ic.Point('hrv')
+        .field('baseline_low_upper', hrv['hrvSummary']['baseline']['lowUpper'])
+        .field('baseline_low_balanced', hrv['hrvSummary']['baseline']['balancedLow'])
+        .field('baseline_upper_balanced', hrv['hrvSummary']['baseline']['balancedUpper'])
+        .field('marker_value', hrv['hrvSummary']['baseline']['markerValue'])
+        .time(hrv['hrvSummary']['createTimeStamp']))
+
+    w([ic.Point('hrv').field('hrv', x['hrvValue']).time(x['readingTimeGMT'])
+       for x in hrv['hrvReadings']])
 
 
 def day_hr(d, e, g, w):
@@ -55,16 +77,38 @@ def day_sleep(d, e, g, w):
      .field('activity_level', m['activityLevel'])
      .time(m['endGMT'] + 'Z') for m in s['sleepMovement']])
 
+  if 'sleepScores' in s:
+    w(ic.Point('sleep')
+       .tag('sleep_score_feedback', s['sleepScoreFeedback'])
+       .tag('sleep_score_insight', s['sleepScoreInsight'])
+       .field('sleep_score', s['sleepScores']['overall']['value'])
+       .field('rem_percentage', s['sleepScores']['remPercentage']['value'])
+       .field('deep_percentage', s['sleepScores']['deepPercentage']['value'])
+       .field('light_percentage', s['sleepScores']['lightPercentage']['value'])
+       .time(d['sleepEndTimestampGMT'], ic.WritePrecision.MS))
+
   if 'sleepStress' in s:
     w([ic.Point('sleep')
        .field('stress', x['value'])
        .time(x['startGMT'], ic.WritePrecision.MS) for x in s['sleepStress']])
 
+  if 'wellnessEpochRespirationDataDTOList' in s:
+    w([ic.Point('sleep')
+       .field('respiration', x['respirationValue'])
+       .time(x['startTimeGMT'], ic.WritePrecision.MS)
+       for x in s['wellnessEpochRespirationDataDTOList']])
+
   w(ic.Point('sleep')
-    .field('sleep_seconds', d['sleepTimeSeconds'])
-    .field('nap_seconds', d['napTimeSeconds'])
     .tag('sleep_window_confirmed', d['sleepWindowConfirmed'])
     .tag('sleep_window_confirmation_type', d['sleepWindowConfirmationType'])
+    .field('sleep_seconds', d['sleepTimeSeconds'])
+    .field('nap_seconds', d['napTimeSeconds'])
+    .field('mean_sleep_stress', d.get('avgSleepStress'))
+    .field('awake_count', d.get('awakeCount'))
+    .field('mean_respiration', d.get('averageRespirationValue'))
+    .field('min_respiration', d.get('minRespirationValue'))
+    .field('max_respiration', d.get('maxRespirationValue'))
+    .field('restless_moments', d.get('restlessMomentsCount'))
     .field('unmeasurable_seconds', d['unmeasurableSleepSeconds'])
     .field('deep_seconds', d['deepSleepSeconds'])
     .field('light_seconds', d['lightSleepSeconds'])
@@ -116,6 +160,7 @@ def day_user(d, e, g, w):
 def day(e, g, w):
   d = dt.datetime.fromtimestamp(se).strftime('%Y-%m-%d')
   print(f'uploading {d}...', end='', flush=True)
+  day_hrv   (d, e, g, w); print(' [hrv]',    end='', flush=True)
   day_hr    (d, e, g, w); print(' [hr]',     end='', flush=True)
   day_steps (d, e, g, w); print(' [steps]',  end='', flush=True)
   day_stress(d, e, g, w); print(' [stress]', end='', flush=True)
@@ -151,4 +196,7 @@ with ic.InfluxDBClient(url=a.server, org=a.org, token=a.token) as i:
     se += 86400    # seconds per day
 
 
-g.logout()
+try:
+  g.logout()
+except:
+  print('failed to logout (this is normal)')
