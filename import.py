@@ -194,9 +194,3 @@ with ic.InfluxDBClient(url=a.server, org=a.org, token=a.token) as i:
   while se <= ee:
     day(se, g, lambda p: w.write(a.bucket, a.org, p))
     se += 86400    # seconds per day
-
-
-try:
-  g.logout()
-except:
-  print('failed to logout (this is normal)')
