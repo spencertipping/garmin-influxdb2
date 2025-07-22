@@ -73,9 +73,10 @@ def day_sleep(d, e, g, w):
   s = g.get_sleep_data(d)
   d = s['dailySleepDTO']
 
-  w([ic.Point('sleep')
-     .field('activity_level', m['activityLevel'])
-     .time(m['endGMT'] + 'Z') for m in s['sleepMovement']])
+  if s['sleepMovement'] is not None:
+    w([ic.Point('sleep')
+       .field('activity_level', m['activityLevel'])
+       .time(m['endGMT'] + 'Z') for m in s['sleepMovement']])
 
   if 'sleepScores' in s:
     w(ic.Point('sleep')
